@@ -529,7 +529,14 @@ export default function Deal({
                 <div>
                   <dt>Void</dt>
                   <dd className="mono">
-                    {money(a.settlement.voidedCents)} <span className="mint">· VOIDED</span>
+                    {a.settlement.voidedCents > 0 ? (
+                      <>
+                        {money(a.settlement.voidedCents)}{" "}
+                        <span className="mint">· VOIDED</span>
+                      </>
+                    ) : (
+                      <span className="muted">no remainder — full amount captured</span>
+                    )}
                   </dd>
                 </div>
                 <div>

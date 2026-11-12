@@ -108,7 +108,7 @@ const CreateBody = z.object({
   prose: z.string().min(12).max(4000),
   buyerName: z.string().min(1).max(80).default("Dev Malhotra"),
   sellerName: z.string().min(1).max(80).default("Marisol Vega"),
-  totalUsd: z.union([z.number(), z.string()]).default(5000),
+  totalUsd: z.coerce.number().positive().max(1_000_000).default(5000),
 });
 
 app.post("/api/agreements", async (req, res, next) => {
