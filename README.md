@@ -495,7 +495,6 @@ docs/
   sample-evidence/ labelled placeholders for a photo-free walkthrough
   screenshots/     the images in this README
   DEMO_RUNBOOK.md  recording shot list and recovery paths
-  HACKATHON_PLAN.md archival research and decision record
 .github/
   workflows/ci.yml typecheck + build + self-test on every push, no secrets needed
 ```

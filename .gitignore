@@ -15,6 +15,10 @@ dist/
 # JSON store and uploaded evidence. Created on first run, safe to delete.
 data/
 
+# --- local notes ----------------------------------------------------------
+# Scratch material kept out of the published repository.
+notes/
+
 # --- one-off local artifacts ---------------------------------------------
 # Written by manual curl testing and by the recording workflow. None of these
 # belong in history, and `npm run verify` never creates them.
