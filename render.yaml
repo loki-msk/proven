@@ -1,0 +1,33 @@
+services:
+  - type: web
+    name: proven
+    runtime: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: 20.11.1
+      - key: PAYPAL_CLIENT_ID
+        sync: false
+      - key: PAYPAL_CLIENT_SECRET
+        sync: false
+      - key: PAYPAL_API_BASE
+        value: https://api-m.sandbox.paypal.com
+      - key: AI_BASE_URL
+        value: https://opencode.ai/inference/openai/v1
+      - key: AI_API_KEY
+        sync: false
+      - key: AI_MODEL
+        value: deepseek-v4.1-flash-free
+      - key: AI_VISION_MODEL
+        value: nemotron-3.5-super-vl-free
+      - key: AI_JSON_MODE
+        value: "1"
+      - key: DATA_DIR
+        value: /var/data
+    disk:
+      name: proven-data
+      mountPath: /var/data
+      sizeGB: 1
