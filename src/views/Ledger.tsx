@@ -50,8 +50,11 @@ export default function Ledger({
       volume: settled.reduce((s, r) => s + r.totalCents, 0),
       released: list.reduce((s, r) => s + r.releasedCents, 0),
       returned: list.reduce((s, r) => s + r.returnedCents, 0),
+      // "Held" means PayPal is actually holding money: an authorization exists
+      // and has not been settled. Status alone is not enough, because a deal can
+      // be AGREED (never funded) or ADJUDICATED without an authorization.
       held: list
-        .filter((r) => ["AGREED", "FUNDED", "EVIDENCE", "ADJUDICATED"].includes(r.status))
+        .filter((r) => r.authorizationId && !r.settledAt)
         .reduce((s, r) => s + r.totalCents, 0),
     };
   }, [rows]);

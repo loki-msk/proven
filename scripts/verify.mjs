@@ -392,7 +392,9 @@ try {
     expect(row.totalCents === 500_000, `total ${row.totalCents}`);
     expect(typeof row.releasedCents === "number", "releasedCents missing");
     expect(typeof row.returnedCents === "number", "returnedCents missing");
-    return `${rows.length} row(s), split fields present`;
+    // The ledger must not claim money is held when no authorization exists.
+    expect(row.authorizationId === null, `unfunded deal reports authorizationId ${row.authorizationId}`);
+    return `${rows.length} row(s), split fields present, no phantom hold`;
   });
 
   await check("agent surface drives the same state machine", async () => {

@@ -270,6 +270,7 @@ export function createAgentRouter(): express.Router {
         totalUsd: centsToUsd(a.totalCents),
         releasedCents: a.settlement?.capturedCents ?? a.verdict?.releaseCents ?? 0,
         returnedCents: a.settlement?.voidedCents ?? a.verdict?.voidedCents ?? 0,
+        authorizationId: a.paypal.authorizationId ?? null,
         clauseCount: a.clauses.length,
         confidence: a.verdict?.overallConfidence ?? null,
         createdAt: a.createdAt,

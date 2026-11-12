@@ -121,6 +121,7 @@ export interface AgreementSummary {
   clauseCount: number;
   releasedCents: number;
   returnedCents: number;
+  authorizationId: string | null;
   confidence: number | null;
   draftModel: string;
   createdAt: string;

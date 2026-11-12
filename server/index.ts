@@ -105,6 +105,7 @@ app.get("/api/agreements", (_req, res) => {
       clauseCount: a.clauses.length,
       releasedCents: a.settlement?.capturedCents ?? a.verdict?.releaseCents ?? 0,
       returnedCents: a.settlement?.voidedCents ?? a.verdict?.voidedCents ?? 0,
+      authorizationId: a.paypal.authorizationId ?? null,
       confidence: a.verdict?.overallConfidence ?? null,
       draftModel: a.draftModel,
       createdAt: a.createdAt,
