@@ -1,0 +1,539 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Proven Agent API",
+    "version": "1.0.0",
+    "summary": "Settlement for work, not shopping.",
+    "description": "Proven turns a plain-language job into a clause-by-clause agreement, has AI verify the delivered evidence against those clauses, and settles the fair percentage through PayPal: a partial capture against a real authorization, with the remainder voided.\n\nThis document describes the agent surface. Same domain logic as the browser UI, but JSON in / JSON out, base64 evidence instead of multipart, and an ordered `nextActions` array on every state-changing response. The model proposes fractions in [0,1]; every dollar amount is computed server-side.",
+    "license": { "name": "MIT" },
+    "contact": { "name": "Proven", "url": "https://github.com/" }
+  },
+  "servers": [
+    { "url": "http://localhost:8787", "description": "Local development" },
+    { "url": "https://proven.onrender.com", "description": "Hosted sandbox demo" }
+  ],
+  "tags": [
+    { "name": "Agreement", "description": "Draft and read the definition of done." },
+    { "name": "Funding", "description": "PayPal order and authorization (intent=AUTHORIZE)." },
+    { "name": "Evidence", "description": "Proof submitted against clauses." },
+    { "name": "Settlement", "description": "Adjudicate, then capture partially and void the remainder." },
+    { "name": "Meta", "description": "Discovery." }
+  ],
+  "security": [{ "bearerAuth": [] }, {}],
+  "paths": {
+    "/api/agent/manifest": {
+      "get": {
+        "tags": ["Meta"],
+        "operationId": "getManifest",
+        "summary": "Tool manifest",
+        "description": "MCP-style tool list with input schemas. Not an MCP server; this is a discovery document for REST callers.",
+        "security": [{ "bearerAuth": [] }, {}],
+        "responses": {
+          "200": {
+            "description": "Manifest",
+            "content": { "application/json": { "schema": { "type": "object", "additionalProperties": true } } }
+          }
+        }
+      }
+    },
+    "/api/agent/agreements": {
+      "get": {
+        "tags": ["Agreement"],
+        "operationId": "listAgreements",
+        "summary": "List agreements with settlement totals",
+        "responses": {
+          "200": {
+            "description": "Agreements",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "count": { "type": "integer" },
+                    "agreements": { "type": "array", "items": { "$ref": "#/components/schemas/AgreementSummary" } }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Agreement"],
+        "operationId": "createAgreement",
+        "summary": "Draft clauses from prose",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["prose"],
+                "properties": {
+                  "prose": { "type": "string", "minLength": 12, "maxLength": 4000, "description": "The job, verbatim. Messy is fine." },
+                  "buyerName": { "type": "string", "default": "Dev Malhotra" },
+                  "sellerName": { "type": "string", "default": "Marisol Vega" },
+                  "totalUsd": { "type": "number", "default": 5000, "description": "Contract value in dollars. Converted to integer cents." }
+                }
+              },
+              "example": {
+                "prose": "Kitchen backsplash replacement, five thousand dollars, done by the 30th. Level, 3mm grout lines, outlet cutout centred and sealed, cleaned up after. Materials receipt required.",
+                "buyerName": "Dev",
+                "sellerName": "Marisol",
+                "totalUsd": 5000
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Drafted. Status is DRAFT.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AgreementState" } } }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" }
+        }
+      }
+    },
+    "/api/agent/agreements/{id}": {
+      "get": {
+        "tags": ["Agreement"],
+        "operationId": "getAgreement",
+        "summary": "Full state plus nextActions",
+        "description": "Poll this rather than guessing what the state machine expects. `nextActions` is ordered and includes the endpoint to call.",
+        "parameters": [{ "$ref": "#/components/parameters/AgreementId" }],
+        "responses": {
+          "200": {
+            "description": "State",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AgreementState" } } }
+          },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/agent/agreements/{id}/approve": {
+      "post": {
+        "tags": ["Agreement"],
+        "operationId": "approveAgreement",
+        "summary": "Record one party's acceptance",
+        "description": "Both parties must accept before the hold can be funded. The second approval moves status to AGREED.",
+        "parameters": [{ "$ref": "#/components/parameters/AgreementId" }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["party"],
+                "properties": { "party": { "type": "string", "enum": ["buyer", "seller"] } }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "State",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AgreementState" } } }
+          },
+          "409": { "$ref": "#/components/responses/Conflict" }
+        }
+      }
+    },
+    "/api/agent/agreements/{id}/paypal/order": {
+      "post": {
+        "tags": ["Funding"],
+        "operationId": "createPayPalOrder",
+        "summary": "Create an order with intent=AUTHORIZE",
+        "description": "Places a hold, not a charge. Returns `approveUrl`, which a human must open and approve in a PayPal sandbox session before the next step.",
+        "parameters": [{ "$ref": "#/components/parameters/AgreementId" }],
+        "responses": {
+          "200": {
+            "description": "Order created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "orderId": { "type": "string" },
+                    "approveUrl": { "type": "string", "format": "uri", "nullable": true },
+                    "status": { "type": "string" },
+                    "nextActions": { "type": "array", "items": { "$ref": "#/components/schemas/NextAction" } }
+                  }
+                }
+              }
+            }
+          },
+          "409": { "$ref": "#/components/responses/Conflict" }
+        }
+      }
+    },
+    "/api/agent/agreements/{id}/paypal/authorize": {
+      "post": {
+        "tags": ["Funding"],
+        "operationId": "authorizePayPalOrder",
+        "summary": "Convert an approved order into an authorization",
+        "description": "Returns the authorization id and its expiry. Funds are now held. Status becomes FUNDED.",
+        "parameters": [{ "$ref": "#/components/parameters/AgreementId" }],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": { "orderId": { "type": "string", "description": "Defaults to the stored order id." } }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Funded",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AgreementState" } } }
+          },
+          "409": { "$ref": "#/components/responses/Conflict" }
+        }
+      }
+    },
+    "/api/agent/agreements/{id}/evidence": {
+      "post": {
+        "tags": ["Evidence"],
+        "operationId": "submitEvidence",
+        "summary": "Attach proof to a clause (base64 JSON)",
+        "description": "One file per clause per call. Accepted mime types: image/jpeg, image/png, image/webp, image/heic, image/heif, application/pdf, text/plain. Max 8MB. Submitting new evidence invalidates any existing verdict.",
+        "parameters": [{ "$ref": "#/components/parameters/AgreementId" }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["clauseId", "filename", "dataBase64"],
+                "properties": {
+                  "clauseId": { "type": "string", "description": "From the clauses array, e.g. c1" },
+                  "filename": { "type": "string" },
+                  "dataBase64": { "type": "string", "description": "Bare base64 or a data:<mime>;base64,<payload> URL" },
+                  "mime": { "type": "string", "description": "Optional if dataBase64 is a data URL or the extension is known" },
+                  "note": { "type": "string", "maxLength": 240 }
+                }
+              },
+              "example": {
+                "clauseId": "c1",
+                "filename": "waterproofing.png",
+                "dataBase64": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==",
+                "note": "membrane before tile"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Uploaded, with the SHA-256 that will appear in the ledger",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/AgreementState" },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "evidence": {
+                          "type": "object",
+                          "properties": {
+                            "id": { "type": "string" },
+                            "clauseId": { "type": "string" },
+                            "sha256": { "type": "string" },
+                            "bytes": { "type": "integer" }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "413": { "description": "File larger than 8MB" },
+          "415": { "description": "Unsupported mime type" }
+        }
+      }
+    },
+    "/api/agent/agreements/{id}/evidence/{evidenceId}": {
+      "delete": {
+        "tags": ["Evidence"],
+        "operationId": "removeEvidence",
+        "summary": "Remove a piece of evidence",
+        "description": "Invalidates the verdict. Not allowed after settlement.",
+        "parameters": [
+          { "$ref": "#/components/parameters/AgreementId" },
+          { "name": "evidenceId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "State",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AgreementState" } } }
+          },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" }
+        }
+      }
+    },
+    "/api/agent/agreements/{id}/adjudicate": {
+      "post": {
+        "tags": ["Settlement"],
+        "operationId": "adjudicate",
+        "summary": "Score every clause against the evidence",
+        "description": "Returns per-clause status, confidence, cited filenames, and the computed release/void amounts. A clause with no evidence is forced to `missing` with a fraction of 0 regardless of what the model says. Low confidence sets `needsHumanReview`.",
+        "parameters": [{ "$ref": "#/components/parameters/AgreementId" }],
+        "responses": {
+          "200": {
+            "description": "Verdict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/AgreementState" },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "verdict": {
+                          "type": "object",
+                          "properties": {
+                            "model": { "type": "string" },
+                            "overallConfidence": { "type": "number" },
+                            "needsHumanReview": { "type": "boolean" },
+                            "releaseCents": { "type": "integer" },
+                            "voidedCents": { "type": "integer" },
+                            "releaseUsd": { "type": "string" },
+                            "voidedUsd": { "type": "string" }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "409": { "$ref": "#/components/responses/Conflict" }
+        }
+      }
+    },
+    "/api/agent/agreements/{id}/settle": {
+      "post": {
+        "tags": ["Settlement"],
+        "operationId": "settle",
+        "summary": "Partial capture, then void the remainder",
+        "description": "Calls POST /v2/payments/authorizations/{id}/capture for the adjudicated amount and POST /v2/payments/authorizations/{id}/void for the balance, then re-reads the authorization so the receipt reflects PayPal's state, not ours. Idempotent: a retry returns the first capture rather than charging twice.\n\nIf `needsHumanReview` is true, this returns 409 REVIEW_REQUIRED until a human sets `reviewAcknowledged: true`.",
+        "parameters": [{ "$ref": "#/components/parameters/AgreementId" }],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": { "reviewAcknowledged": { "type": "boolean", "default": false } }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Settled",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AgreementState" } } }
+          },
+          "409": {
+            "description": "NOT_ADJUDICATED, NO_AUTHORIZATION, or REVIEW_REQUIRED",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Only enforced when AGENT_API_KEY is set on the server. Unset means the sandbox demo is open."
+      }
+    },
+    "parameters": {
+      "AgreementId": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "schema": { "type": "string", "example": "deal_68a77542848b4e" }
+      }
+    },
+    "responses": {
+      "BadRequest": {
+        "description": "Validation failed",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      },
+      "NotFound": {
+        "description": "No such agreement",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      },
+      "Conflict": {
+        "description": "The state machine does not allow this yet",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      }
+    },
+    "schemas": {
+      "AgreementSummary": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "title": { "type": "string" },
+          "status": { "$ref": "#/components/schemas/AgreementStatus" },
+          "currency": { "type": "string", "example": "USD" },
+          "totalCents": { "type": "integer" },
+          "totalUsd": { "type": "string" },
+          "releasedCents": { "type": "integer" },
+          "returnedCents": { "type": "integer" },
+          "clauseCount": { "type": "integer" },
+          "confidence": { "type": "number", "nullable": true },
+          "createdAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "AgreementStatus": {
+        "type": "string",
+        "enum": ["DRAFT", "AGREED", "FUNDED", "EVIDENCE", "ADJUDICATED", "SETTLED"]
+      },
+      "Clause": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "title": { "type": "string" },
+          "requirement": { "type": "string" },
+          "evidenceRequired": { "type": "array", "items": { "type": "string" } },
+          "weight": { "type": "number", "description": "Share of the contract. Normalised server-side before money is computed." }
+        }
+      },
+      "ClauseVerdict": {
+        "type": "object",
+        "properties": {
+          "clauseId": { "type": "string" },
+          "status": { "type": "string", "enum": ["pass", "partial", "fail", "missing"] },
+          "confidence": { "type": "number" },
+          "citedEvidence": { "type": "array", "items": { "type": "string" } },
+          "explanation": { "type": "string" },
+          "proposedFraction": { "type": "number" }
+        }
+      },
+      "Evidence": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "clauseId": { "type": "string" },
+          "filename": { "type": "string" },
+          "originalName": { "type": "string" },
+          "mime": { "type": "string" },
+          "size": { "type": "integer" },
+          "sha256": { "type": "string" },
+          "note": { "type": "string" },
+          "url": { "type": "string" },
+          "createdAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "Settlement": {
+        "type": "object",
+        "properties": {
+          "captureId": { "type": "string" },
+          "captureStatus": { "type": "string", "example": "COMPLETED" },
+          "capturedCents": { "type": "integer" },
+          "voidedCents": { "type": "integer" },
+          "voidedAt": { "type": "string", "nullable": true },
+          "authorizationStatus": { "type": "string", "example": "VOIDED" },
+          "settledAt": { "type": "string", "format": "date-time" },
+          "idempotencyKey": { "type": "string" }
+        }
+      },
+      "NextAction": {
+        "type": "object",
+        "properties": {
+          "action": { "type": "string", "example": "submit_evidence" },
+          "method": { "type": "string", "enum": ["GET", "POST", "DELETE"] },
+          "endpoint": { "type": "string" },
+          "note": { "type": "string" }
+        }
+      },
+      "AgreementState": {
+        "type": "object",
+        "properties": {
+          "agreement": { "$ref": "#/components/schemas/Agreement" },
+          "nextActions": { "type": "array", "items": { "$ref": "#/components/schemas/NextAction" } }
+        }
+      },
+      "Agreement": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "title": { "type": "string" },
+          "prose": { "type": "string" },
+          "buyerName": { "type": "string" },
+          "sellerName": { "type": "string" },
+          "currency": { "type": "string" },
+          "totalCents": { "type": "integer" },
+          "status": { "$ref": "#/components/schemas/AgreementStatus" },
+          "clauses": { "type": "array", "items": { "$ref": "#/components/schemas/Clause" } },
+          "approvals": {
+            "type": "object",
+            "properties": { "buyer": { "type": "boolean" }, "seller": { "type": "boolean" } }
+          },
+          "evidence": { "type": "array", "items": { "$ref": "#/components/schemas/Evidence" } },
+          "verdict": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "model": { "type": "string" },
+              "clauses": { "type": "array", "items": { "$ref": "#/components/schemas/ClauseVerdict" } },
+              "overallConfidence": { "type": "number" },
+              "summaryForBuyer": { "type": "string" },
+              "summaryForSeller": { "type": "string" },
+              "needsHumanReview": { "type": "boolean" },
+              "releaseCents": { "type": "integer" },
+              "voidedCents": { "type": "integer" },
+              "createdAt": { "type": "string", "format": "date-time" }
+            }
+          },
+          "settlement": { "oneOf": [{ "$ref": "#/components/schemas/Settlement" }, { "type": "null" }] },
+          "paypal": {
+            "type": "object",
+            "properties": {
+              "orderId": { "type": "string", "nullable": true },
+              "orderStatus": { "type": "string", "nullable": true },
+              "authorizationId": { "type": "string", "nullable": true },
+              "authorizationStatus": { "type": "string", "nullable": true },
+              "authorizationExpiresAt": { "type": "string", "nullable": true },
+              "captureId": { "type": "string", "nullable": true }
+            }
+          },
+          "draftModel": { "type": "string" },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" },
+          "events": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "string" },
+                "type": { "type": "string" },
+                "actor": { "type": "string" },
+                "detail": { "type": "string" },
+                "createdAt": { "type": "string", "format": "date-time" }
+              }
+            }
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": { "type": "string" },
+          "code": { "type": "string", "example": "NO_AUTHORIZATION" },
+          "issues": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    }
+  }
+}

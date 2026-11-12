@@ -1,4 +1,4 @@
-import type { Agreement, Health, Party } from "./types";
+import type { Agreement, AgreementSummary, Health, Party } from "./types";
 
 export class ApiError extends Error {
   status: number;
@@ -53,8 +53,8 @@ export const api = {
 
   getAgreement: (id: string) => req<{ agreement: Agreement }>(`/api/agreements/${id}`),
 
-  approve: (id: string, party: Party) =>
-    req<{ agreement: Agreement }>(`/api/agreements/${id}/approve`, {
+  listAgreements: () => req<{ agreements: AgreementSummary[] }>("/api/agreements"),
+  approve: (id: string, party: Party) =>    req<{ agreement: Agreement }>(`/api/agreements/${id}/approve`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ party }),

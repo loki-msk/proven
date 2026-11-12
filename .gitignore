@@ -4,5 +4,6 @@ data
 .env
 .env.local
 *.log
+*.err
 .DS_Store
 uploads

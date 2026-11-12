@@ -6,18 +6,20 @@ Proven turns a plain-language job into a clause-by-clause agreement, has AI veri
 evidence against those clauses, and settles the fair percentage through PayPal — a **real partial
 capture** against a **real authorization**, with the remainder **voided**.
 
-**Demo:** _<add hosted URL>_ · **Video:** _<add YouTube link>_ · **Built with:** PayPal Orders v2
-(`intent: AUTHORIZE`), PayPal Payments v2 (partial capture + void), React, TypeScript, Node,
-Express, Zod, a vision-capable LLM via an OpenAI-compatible endpoint.
+**Demo:** _<add hosted URL>_ · **Video:** _<add YouTube link>_ · **OpenAPI:**
+[`docs/openapi.json`](docs/openapi.json) (served at `/api/openapi.json`) · **Built with:** PayPal
+Orders v2 (`intent: AUTHORIZE`), PayPal Payments v2 (partial capture + void), React, TypeScript,
+Node, Express, Zod, AG Grid, a vision-capable LLM via an OpenAI-compatible endpoint.
 
 > 85% of freelancers report being paid late (Remote, 2025). 56% of US small businesses carry unpaid
 > invoices averaging $17,500 (Intuit QuickBooks, 2025).
 
-**The three things to look at**
+**The four things to look at**
 
 1. **AI-authored acceptance criteria** — a vague text message becomes clauses with machine-checkable evidence requirements.
 2. **Clause-level verdicts** — status, confidence, and the exact file cited, per clause.
 3. **`PARTIALLY_CAPTURED` + `VOIDED`** — on a real PayPal sandbox authorization, verified server-side.
+4. **Two surfaces, one state machine** — the same settlement is drivable by a human in a deal room or by an agent over [`/api/agent`](#agent-surface), with an OpenAPI 3.1 contract and an AG Grid ledger over the results.
 
 ---
 
@@ -35,6 +37,7 @@ The hosted instance runs against PayPal **sandbox** — disposable credentials, 
    | Password | `_<sandbox-buyer-password>_` |
 
 4. Upload any 3–5 photos, run **Adjudicate**, then **Approve & settle**.
+5. Open **Ledger** in the header to see every agreement with its released and returned split.
 
 > The buyer account is a PayPal *sandbox* login created for this demo. It has no real funds and no
 > access to anything outside the sandbox.
@@ -68,11 +71,16 @@ void    = total − release
 The buyer approves. The server calls:
 
 ```
-POST /v2/payments/authorizations/{auth}/capture   amount=release, final_capture=true
+POST /v2/payments/authorizations/{auth}/capture   amount=release   (no final_capture)
 POST /v2/payments/authorizations/{auth}/void
 ```
 
 then re-reads the authorization with `GET` so the receipt shows PayPal's own state, not ours.
+
+`final_capture` is deliberately **omitted**. Setting it to `true` closes the authorization, which
+leaves the uncaptured remainder to expire on its own — the buyer's money stays reserved for days.
+Capturing partially and then voiding releases it immediately. See the comment in
+`server/paypal.ts`.
 
 ## PayPal integration
 
@@ -129,6 +137,7 @@ Production: `npm run build && npm start` (Express serves `dist/`).
 | `AI_JSON_MODE` | no | `0` disables `response_format: json_object` for gateways that reject it. |
 | `PORT` | no | Defaults to `8787`. |
 | `DATA_DIR` | no | Defaults to `./data` (JSON store + uploaded evidence). |
+| `AGENT_API_KEY` | no | Set to require `Authorization: Bearer <key>` on `/api/agent`. Unset = open sandbox demo. |
 
 ### Sandbox setup
 
@@ -167,9 +176,17 @@ that file, because real PayPal ids are the strongest evidence that the build wor
 
 ## API surface
 
+Proven has two front doors onto **one domain layer** (`server/service.ts`). The browser calls REST
+with multipart uploads; an autonomous agent calls the same state machine with JSON and base64. The
+money rules, guards, and event ledger are identical, so a settlement cannot diverge based on which
+surface drove it.
+
+### Browser surface
+
 | Method | Path | Purpose |
 |---|---|---|
 | `GET` | `/api/health` | Config + mode (never returns the secret). |
+| `GET` | `/api/agreements` | Ledger rows: status, totals, released/returned, confidence. |
 | `POST` | `/api/agreements` | Draft clauses from prose. |
 | `GET` | `/api/agreements/:id` | Full agreement state. |
 | `POST` | `/api/agreements/:id/approve` | `{ party: "buyer" \| "seller" }`. |
@@ -179,22 +196,99 @@ that file, because real PayPal ids are the strongest evidence that the build wor
 | `DELETE` | `/api/agreements/:id/evidence/:evidenceId` | Remove evidence (invalidates the verdict). |
 | `POST` | `/api/agreements/:id/adjudicate` | Run adjudication. |
 | `POST` | `/api/agreements/:id/settle` | Capture + void. `{ reviewAcknowledged?: boolean }`. |
+| `GET` | `/api/openapi.json` | The agent contract, as OpenAPI 3.1. |
+
+### Agent surface
+
+`/api/agent` is a tool-shaped namespace: JSON in, JSON out, base64 evidence, and an ordered
+**`nextActions`** array on every state-changing response so a caller never has to infer what the
+state machine wants next.
+
+| Tool | Call |
+|---|---|
+| `create_agreement` | `POST /api/agent/agreements` |
+| `get_agreement` | `GET /api/agent/agreements/{id}` |
+| `list_agreements` | `GET /api/agent/agreements` |
+| `approve` | `POST /api/agent/agreements/{id}/approve` |
+| `create_paypal_order` | `POST /api/agent/agreements/{id}/paypal/order` |
+| `authorize_paypal_order` | `POST /api/agent/agreements/{id}/paypal/authorize` |
+| `submit_evidence` | `POST /api/agent/agreements/{id}/evidence` |
+| `adjudicate` | `POST /api/agent/agreements/{id}/adjudicate` |
+| `settle` | `POST /api/agent/agreements/{id}/settle` |
+
+Discovery: `GET /api/agent/manifest` (tool list with input schemas), `GET /api/openapi.json`
+(OpenAPI 3.1, importable into Postman or APIMatic).
+
+Set `AGENT_API_KEY` to require `Authorization: Bearer <key>` on every agent call. Left unset, the
+surface is open so judges can poke it without credentials. The key is compared with
+`crypto.timingSafeEqual`.
+
+```bash
+# 1. Draft
+curl -s localhost:8787/api/agent/agreements \
+  -H 'content-type: application/json' \
+  -d '{"prose":"Kitchen backsplash, $5,000, level tile, 3mm grout, outlet cutout sealed, site cleaned. Materials receipt required."}'
+# → { "agreement": { "id": "deal_…", "status": "DRAFT", … }, "nextActions": [ … ] }
+
+# 2. Both parties accept
+curl -s localhost:8787/api/agent/agreements/deal_…/approve \
+  -H 'content-type: application/json' -d '{"party":"buyer"}'
+curl -s localhost:8787/api/agent/agreements/deal_…/approve \
+  -H 'content-type: application/json' -d '{"party":"seller"}'
+
+# 3. Fund with a real hold, approve in a browser, then authorize
+curl -s -X POST localhost:8787/api/agent/agreements/deal_…/paypal/order
+# → { "orderId": "…", "approveUrl": "https://www.sandbox.paypal.com/…" }
+curl -s -X POST localhost:8787/api/agent/agreements/deal_…/paypal/authorize
+
+# 4. Attach proof to a clause (bare base64 or a data: URL)
+curl -s localhost:8787/api/agent/agreements/deal_…/evidence \
+  -H 'content-type: application/json' \
+  -d '{"clauseId":"c1","filename":"grout.jpg","dataBase64":"data:image/jpeg;base64,/9j/4AAQ…"}'
+
+# 5. Adjudicate, then settle
+curl -s -X POST localhost:8787/api/agent/agreements/deal_…/adjudicate
+curl -s localhost:8787/api/agent/agreements/deal_…/settle \
+  -H 'content-type: application/json' -d '{"reviewAcknowledged":true}'
+```
+
+The last call performs the partial capture and void. The response carries the capture id, the
+authorization's new status, and the two amounts — all read back from PayPal.
+
+> The model only ever proposes fractions. Dollar figures are computed in `server/money.ts`, which is
+> the only module allowed to do arithmetic on money. An agent cannot ask Proven to capture an amount
+> the adjudication did not justify.
 
 ## Architecture
 
 ```
-React (Vite) ── /api ──▶ Express
-                          ├── ai.ts      draftAgreement · adjudicate (Zod-validated)
-                          ├── money.ts   computeSettlement (the only place money is computed)
-                          ├── paypal.ts  token cache · orders · authorize · capture · void
-                          └── store.ts   JSON store + append-only event log + uploads
-                                        data/db.json · data/uploads/
+React (Vite)
+  ├── Home · Deal        browser deal room
+  └── Ledger             AG Grid, lazy-loaded (~900 kB not on the landing path)
+        │
+        ├── /api/…                  multipart, browser-shaped
+        └── /api/agent/…            JSON + base64, agent-shaped
+                    │
+                    ▼
+            service.ts   ← the only domain layer: guards, state machine, events
+                    │
+     ┌──────────────┼───────────────┬─────────────────┐
+     ▼              ▼               ▼                 ▼
+   ai.ts        money.ts         paypal.ts         store.ts
+ draftAgreement  computeSettlement  token cache     JSON store
+ adjudicate      (only money math)  orders          event log
+ (Zod-validated)                    authorize       uploads
+                                    capture · void
 ```
+
+Two surfaces, one state machine. Adding a surface means writing a router, not a second
+implementation of settlement.
 
 ## Known limitations
 
 - Single-process JSON store. Fine for a demo; not for concurrency.
-- No auth. Two "party" buttons stand in for identity.
+- No identity layer. Two "party" buttons stand in for signed-in users; the agent API is protected by
+  a shared bearer token, not per-caller scopes.
 - The 29-day authorization window is real, so a stale demo authorization will fail to capture —
   fund and settle in the same run.
 - Webhook signature verification is not implemented.

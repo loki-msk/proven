@@ -107,4 +107,22 @@ export interface Health {
   models: { text: string; vision: string | null };
   currency: string;
   clientId: string | null;
+  agentApi?: { enabled: boolean; auth: string };
+}
+
+export interface AgreementSummary {
+  id: string;
+  title: string;
+  status: AgreementStatus;
+  currency: string;
+  totalCents: number;
+  buyerName: string;
+  sellerName: string;
+  clauseCount: number;
+  releasedCents: number;
+  returnedCents: number;
+  confidence: number | null;
+  draftModel: string;
+  createdAt: string;
+  settledAt: string | null;
 }
