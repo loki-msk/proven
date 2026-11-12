@@ -23,6 +23,20 @@ against those clauses, and settles **exactly the proven percentage** through Pay
 
 ---
 
+## What it looks like
+
+![Deal room after settlement](docs/screenshots/deal.png)
+
+*One screen, after the AI judged the evidence and PayPal settled: three clauses verified, two
+unproven, `$4,000` captured, `$1,000` returned. The amber banner is the offline fallback labelling
+itself honestly — with an API key it disappears.*
+
+| Draft in plain language | Every agreement ever settled |
+|---|---|
+| ![Home](docs/screenshots/home.png) | ![Ledger](docs/screenshots/ledger.png) |
+
+---
+
 ## The problem
 
 Freelance and small-contract work settles in one of two bad ways.
@@ -168,7 +182,8 @@ the deal room loses its amber fallback banner.
 ## Validate the submission
 
 This section is the point of the repository. Each claim below has a command and an observable
-result. `npm run verify` needs no credentials, no network, and no browser.
+result. `npm run verify` needs no credentials, no network, and no browser. The same three commands
+run in CI on every push (`.github/workflows/ci.yml`).
 
 ### 1. Deterministic core — `npm run verify`
 
@@ -478,8 +493,11 @@ scripts/
 docs/
   openapi.json     OpenAPI 3.1 contract, served at /api/openapi.json
   sample-evidence/ labelled placeholders for a photo-free walkthrough
+  screenshots/     the images in this README
   DEMO_RUNBOOK.md  recording shot list and recovery paths
   HACKATHON_PLAN.md archival research and decision record
+.github/
+  workflows/ci.yml typecheck + build + self-test on every push, no secrets needed
 ```
 
 ## AI disclosure
