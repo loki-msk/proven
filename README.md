@@ -25,6 +25,16 @@ against those clauses, and settles **exactly the proven percentage** through Pay
 
 ---
 
+## Watch it run
+
+[![Watch the demo](docs/thumbnail.jpg)](https://youtu.be/yzS9dXiAHZA)
+
+Two and a half minutes, narrated, recorded from the app in this repository — no login, no AI key,
+nothing staged. The deterministic fallback is labelled on screen, and the settlement shown is the
+real sandbox transaction in [`docs/paypal-proof.txt`](docs/paypal-proof.txt).
+
+---
+
 ## What it looks like
 
 ![Deal room after settlement](docs/screenshots/deal.png)

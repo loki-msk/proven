@@ -1,5 +1,8 @@
 # Demo runbook
 
+**Published walkthrough:** <https://youtu.be/yzS9dXiAHZA> (2:37, recorded from this app with no AI
+key). This runbook is the manual fallback if you need to re-record or walk a judge through it live.
+
 Operational companion to the validation section of the [README](../README.md). This is the sheet you
 keep on a second monitor while recording. It assumes nothing works by luck.
 
