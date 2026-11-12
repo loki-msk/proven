@@ -98,12 +98,18 @@ async function call(method, pathname, body, requestId) {
 
   if (!res.ok) {
     const detail = Array.isArray(json.details) ? json.details[0] : null;
-    die(
+    // Throw rather than exit: the authorize step retries while the human is
+    // still approving in the browser, and process.exit() would make that dead
+    // code. main()'s catch turns this into the same readable failure.
+    const err = new Error(
       `${method} ${pathname} -> ${res.status} ${detail?.issue || json.name || ""}\n` +
         `     ${detail?.description || json.message || ""}\n` +
         `     debug_id: ${json.debug_id || "n/a"}\n` +
         `     ${JSON.stringify(json)}`,
     );
+    err.status = res.status;
+    err.issue = detail?.issue;
+    throw err;
   }
   return json;
 }
@@ -162,8 +168,12 @@ async function main() {
       record("order_status_after_approval", res.status);
       break;
     } catch (err) {
-      if (attempt === 10) throw err;
-      console.log(`     not approved yet (attempt ${attempt}) — retry in 3s`);
+      // 401/403 means the credentials are wrong, not that the buyer is slow.
+      // Everything else (422 ORDER_NOT_APPROVED) is worth waiting for, because
+      // PayPal sometimes takes a few seconds to register the approval.
+      const credentialsBad = err.status === 401 || err.status === 403;
+      if (credentialsBad || attempt === 10) throw err;
+      console.log(`     not approved yet (attempt ${attempt}, HTTP ${err.status}) — retry in 3s`);
       await new Promise((r) => setTimeout(r, 3000));
     }
   }
@@ -225,4 +235,7 @@ async function main() {
   console.log("  Commit that file. Real ids in a public repo are the strongest evidence of a working build.\n");
 }
 
-main().catch((err) => die(err?.stack || String(err)));
+main().catch((err) => {
+  // PayPal failures already carry a formatted message; real bugs deserve a stack.
+  die(err?.status ? err.message : err?.stack || String(err));
+});
