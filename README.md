@@ -153,6 +153,23 @@ Production: `npm run build && npm start` (Express serves `dist/`).
 > about partial captures, that is an account setting, not the app. Prove it end to end with
 > `npm run spike` before recording.
 
+## Deploy
+
+`render.yaml` is a Blueprint for [Render](https://render.com). Import the repo, then fill the three
+`sync: false` variables in the dashboard (`PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, `AI_API_KEY`).
+
+Two Free-plan constraints, both real and both worth knowing before a demo:
+
+- **The filesystem is ephemeral.** Free services cannot attach a disk, so `data/` — the JSON store
+  and uploaded evidence — is lost on restart or spin-down. A demo agreement takes ~40 seconds to
+  recreate, so this is acceptable; for a demo that must survive restarts, switch `plan` to
+  `starter`, uncomment the disk block, and set `DATA_DIR` to the mount path.
+- **It sleeps after 15 minutes of no traffic** and takes roughly a minute to wake. Open the URL
+  before you present or record.
+
+`npm start` runs TypeScript directly through `tsx`, which is therefore a runtime dependency rather
+than a dev dependency — a production install (`NODE_ENV=production`) still works.
+
 ## Real vs simulated
 
 Before recording, run the mechanism test:

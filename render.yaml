@@ -1,3 +1,17 @@
+# Render blueprint. Import this repo as a Blueprint, or create the service by hand
+# and copy these values.
+#
+# Two Free-plan facts that matter for a hackathon demo:
+#
+#   1. Free services cannot attach a persistent disk. The filesystem is
+#      ephemeral, so `data/` (the JSON store and uploaded evidence) is lost on
+#      restart, redeploy, or spin-down. That is acceptable here: every agreement
+#      can be recreated in about 40 seconds. If you want a demo that survives
+#      restarts mid-walkthrough, change `plan` to `starter`, uncomment the disk
+#      block, and set DATA_DIR to the mount path.
+#   2. Free services spin down after 15 minutes without traffic and take about
+#      a minute to wake. Open the URL once before demoing or recording, and
+#      judge-facing instructions should say "first load may take ~30s".
 services:
   - type: web
     name: proven
@@ -25,9 +39,13 @@ services:
         value: nemotron-3.5-super-vl-free
       - key: AI_JSON_MODE
         value: "1"
-      - key: DATA_DIR
-        value: /var/data
-    disk:
-      name: proven-data
-      mountPath: /var/data
-      sizeGB: 1
+      # Leave AGENT_API_KEY unset so judges can curl /api/agent without a token.
+# --- Paid alternative: survives restarts -----------------------------------
+#    plan: starter
+#    envVars:
+#      - key: DATA_DIR
+#        value: /var/data
+#    disk:
+#      name: proven-data
+#      mountPath: /var/data
+#      sizeGB: 1
