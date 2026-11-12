@@ -29,6 +29,9 @@ services:
         sync: false
       - key: PAYPAL_API_BASE
         value: https://api-m.sandbox.paypal.com
+      # Demo defaults. If you deploy with an OpenAI/OpenRouter/Ollama key instead,
+      # change AI_BASE_URL and both model names too, or the key is sent to the
+      # wrong endpoint.
       - key: AI_BASE_URL
         value: https://opencode.ai/inference/openai/v1
       - key: AI_API_KEY

@@ -139,7 +139,9 @@ npm run build        # writes dist/
 
 ### Enable the AI (recommended)
 
-Put any OpenAI-compatible key in `.env`:
+The client is provider-agnostic: it calls any OpenAI-compatible `/chat/completions` endpoint, so
+there is no vendor SDK to swap. The defaults below are the free endpoint used for the recorded demo,
+which is why a fresh clone behaves exactly like the video:
 
 ```ini
 AI_BASE_URL=https://opencode.ai/inference/openai/v1
@@ -147,6 +149,19 @@ AI_API_KEY=...
 AI_MODEL=deepseek-v4.1-flash-free
 AI_VISION_MODEL=nemotron-3.5-super-vl-free
 ```
+
+**Using OpenAI, OpenRouter, a local Ollama, or anything else? Replace all four values, not just the
+key.** `AI_BASE_URL` and the model names are what select the provider; changing only `AI_API_KEY`
+sends your key to the demo endpoint.
+
+| Provider | `AI_BASE_URL` | `AI_MODEL` | `AI_VISION_MODEL` |
+|---|---|---|---|
+| OpenAI | `https://api.openai.com/v1` | `gpt-4o-mini` | `gpt-4o-mini` |
+| OpenRouter | `https://openrouter.ai/api/v1` | `openai/gpt-4o-mini` | `anthropic/claude-3.5-sonnet` |
+| Ollama (local) | `http://localhost:11434/v1` | `llama3.1` | `llava` |
+
+Claude's native API is not OpenAI-shaped; reach it through OpenRouter or another gateway. If your
+gateway rejects `response_format: {"type":"json_object"}`, set `AI_JSON_MODE=0`.
 
 Then confirm the endpoint supports what the app needs — plain chat, JSON mode, and image input:
 
@@ -295,9 +310,9 @@ recording.
 | `PAYPAL_CLIENT_SECRET` | for money | — | Server-only. Never sent to the browser. |
 | `PAYPAL_API_BASE` | no | `https://api-m.sandbox.paypal.com` | Point at live only if you mean it. |
 | `AI_API_KEY` | no | — | Blank = labelled offline fallback. |
-| `AI_BASE_URL` | no | OpenCode Zen endpoint | Any OpenAI-compatible `/chat/completions`. |
-| `AI_MODEL` | no | `deepseek-v4.1-flash-free` | Clause drafting. |
-| `AI_VISION_MODEL` | no | `nemotron-3.5-super-vl-free` | Evidence adjudication. Blank = text/metadata only, lower confidence. |
+| `AI_BASE_URL` | no | Demo endpoint (OpenCode Zen) | Any OpenAI-compatible `/chat/completions`. Set this together with the model names when switching providers. |
+| `AI_MODEL` | no | `deepseek-v4.1-flash-free` | Text model at `AI_BASE_URL`. |
+| `AI_VISION_MODEL` | no | `nemotron-3.5-super-vl-free` | Vision model at `AI_BASE_URL`. Blank = text/metadata only, lower confidence. |
 | `AI_JSON_MODE` | no | `1` | Set `0` if your gateway rejects `response_format: json_object`. |
 | `PORT` | no | `8787` | API and production web. |
 | `DATA_DIR` | no | `./data` | JSON store plus uploaded evidence. |
@@ -513,8 +528,10 @@ docs/
 
 ## AI disclosure
 
-- **Drafting:** `deepseek-v4.1-flash-free` via an OpenAI-compatible endpoint (OpenCode Zen by default).
-- **Adjudication:** `nemotron-3.5-super-vl-free` for image evidence, same endpoint.
+- **Drafting (recorded demo):** `deepseek-v4.1-flash-free` via an OpenAI-compatible endpoint (OpenCode
+  Zen by default). Any OpenAI-compatible text model works; see [Enable the AI](#enable-the-ai-recommended).
+- **Adjudication (recorded demo):** `nemotron-3.5-super-vl-free` for image evidence, same endpoint.
+  Point `AI_MODEL` and `AI_VISION_MODEL` at whichever provider you have a key for.
 - **What the model is allowed to do:** propose clause text, and per-clause `{status, confidence,
   citedEvidence, explanation, proposedFraction}`.
 - **What it is not allowed to do:** produce dollar amounts, cite evidence that does not exist, or
