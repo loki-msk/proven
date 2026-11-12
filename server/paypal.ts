@@ -175,10 +175,6 @@ export async function createAuthorizeOrder(input: CreateOrderInput) {
   };
 }
 
-export async function getOrder(orderId: string) {
-  return request<any>("GET", `/v2/checkout/orders/${encodeURIComponent(orderId)}`);
-}
-
 export async function authorizeOrder(orderId: string) {
   const res = await request<any>(
     "POST",

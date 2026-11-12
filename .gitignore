@@ -1,9 +1,33 @@
-node_modules
-dist
-data
+# --- dependencies ---------------------------------------------------------
+node_modules/
+
+# --- build output ---------------------------------------------------------
+dist/
+*.tsbuildinfo
+
+# --- local configuration and secrets --------------------------------------
+# .env.example is committed on purpose; every other .env* file is not.
 .env
-.env.local
+.env.*
+!.env.example
+
+# --- runtime state --------------------------------------------------------
+# JSON store and uploaded evidence. Created on first run, safe to delete.
+data/
+
+# --- one-off local artifacts ---------------------------------------------
+# Written by manual curl testing and by the recording workflow. None of these
+# belong in history, and `npm run verify` never creates them.
 *.log
 *.err
+last-deal.txt
+req.json
+resp.json
+order.json
+shot-*.png
+
+# --- tooling / OS ---------------------------------------------------------
 .DS_Store
-uploads
+Thumbs.db
+.vscode/
+.idea/

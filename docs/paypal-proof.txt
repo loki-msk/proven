@@ -1,0 +1,53 @@
+Proven — PayPal proof of mechanism
+==================================
+
+Produced by the application itself, then re-read from PayPal's API.
+Nothing below is mocked or hand-written: every id and status is PayPal's.
+
+source:            real sandbox settlement, agreement deal_12d1a250835749
+mode:              sandbox (api-m.sandbox.paypal.com)
+recorded:          2026-11-12T15:02:35.299Z
+
+-- the hold ------------------------------------------------------------
+authorization_id:  53031775H3888563X
+authorization_status: VOIDED   (was CREATED before settlement)
+amount_authorized: 5000.00 USD
+authorized_at:     2026-11-12T14:15:24Z
+expires_at:        2026-12-11T14:15:24Z
+
+-- what was captured ---------------------------------------------------
+capture_id:        30F03817HJ137835C
+capture_status:    COMPLETED
+capture_amount:    4000.00 USD
+capture_final:     false
+captured_at:       2026-11-12T14:26:51Z
+
+-- what was released ---------------------------------------------------
+authorization_status_after: VOIDED
+voided_amount:     $1000.00
+voided_at:         2026-11-12T14:26:53.862Z
+
+-- the adjudication that set the amount --------------------------------
+contract_total:    $5000.00
+released:          $4000.00
+returned:          $1000.00
+released_plus_returned = contract_total: yes
+verdict_model:     heuristic-fallback
+overall_confidence: 0.876
+needs_human_review: true
+
+clause outcomes:
+  c1  20%  pass     fraction 1  Preparation completed
+  c2  40%  pass     fraction 1  Primary work installed
+  c3  20%  pass     fraction 1  Details and finishes
+  c4  10%  missing  fraction 0  Site left clean
+  c5  10%  missing  fraction 0  Materials accounted for
+
+Expected reading:
+  capture_status COMPLETED, final_capture false, authorization VOIDED.
+  The buyer was charged only the adjudicated portion; the rest was released
+  immediately rather than left to expire on the authorization.
+
+Note: this settlement used the offline heuristic adjudicator, whose model is
+recorded above. It decides whether evidence exists, not whether the work is
+good. With AI_API_KEY set, the same endpoint returns a vision-model verdict.

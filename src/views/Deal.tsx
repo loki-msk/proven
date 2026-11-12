@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { PayPalButtons, PayPalScriptProvider } from "@paypal/react-paypal-js";
 import { api, ApiError } from "../api";
 import type { Agreement, Clause, ClauseVerdict, Evidence, Health } from "../types";

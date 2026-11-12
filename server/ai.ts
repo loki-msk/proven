@@ -114,7 +114,7 @@ export async function draftAgreement(
   sellerName: string,
   totalCents: number,
 ): Promise<{ title: string; clauses: Clause[]; model: string }> {
-  if (!aiConfigured) return heuristicDraft(prose, totalCents);
+  if (!aiConfigured) return heuristicDraft(prose);
 
   const user = `Buyer: ${buyerName}
 Seller: ${sellerName}
@@ -409,7 +409,7 @@ function heuristicTitle(prose: string): string {
   return tidyTitle(head.length >= 12 && head.length <= 70 ? head : firstLine);
 }
 
-function heuristicDraft(prose: string, totalCents: number) {
+function heuristicDraft(prose: string) {
   return {
     title: heuristicTitle(prose),
     clauses: normalizeClauseWeights(

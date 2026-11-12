@@ -6,10 +6,10 @@ import path from "node:path";
 import fs from "node:fs";
 import { z } from "zod";
 
-import { store, logEvent, uploadsDir } from "./store.ts";
+import { store, uploadsDir } from "./store.ts";
 import { aiConfigured, aiModels } from "./ai.ts";
 import { PayPalError, paypalConfigured, paypalMode } from "./paypal.ts";
-import { usdToCents, centsToUsd } from "./money.ts";
+import { usdToCents } from "./money.ts";
 import {
   ACCEPTED_MIME,
   CURRENCY,

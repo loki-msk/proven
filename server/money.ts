@@ -1,4 +1,4 @@
-import type { Clause, ClauseVerdict, Verdict } from "./types.ts";
+import type { Clause, ClauseVerdict } from "./types.ts";
 
 /**
  * Money is ALWAYS computed here, never by the model.
@@ -57,10 +57,4 @@ export function overallConfidence(verdicts: ClauseVerdict[]): number {
 
 export function needsReview(verdicts: ClauseVerdict[], overall: number): boolean {
   return overall < 0.75 || verdicts.some((v) => clamp01(v.confidence) < 0.6);
-}
-
-export function summarize(verdict: Verdict): string {
-  const released = (verdict.releaseCents / 100).toFixed(2);
-  const voided = (verdict.voidedCents / 100).toFixed(2);
-  return `Released $${released} · Returned $${voided}`;
 }
