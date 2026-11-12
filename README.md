@@ -1,5 +1,7 @@
 # Proven
 
+[![CI](https://github.com/loki-msk/proven/actions/workflows/ci.yml/badge.svg)](https://github.com/loki-msk/proven/actions/workflows/ci.yml)
+
 **Payment follows proof.**
 
 Every payment product treats a job as either delivered or not. Reality is a gradient. Proven turns
