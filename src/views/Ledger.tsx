@@ -6,7 +6,7 @@ import "ag-grid-community/styles/ag-theme-quartz.css";
 
 import { api, ApiError } from "../api";
 import type { AgreementSummary } from "../types";
-import { Button, Card, Notice, StatusPill, clock, day, money, pct, short } from "../ui";
+import { Button, Card, Notice, StatusPill, money, pct, short } from "../ui";
 
 /**
  * The settlement ledger.
@@ -62,7 +62,7 @@ export default function Ledger({
         headerName: "Agreement",
         field: "title",
         flex: 2.4,
-        minWidth: 240,
+        minWidth: 200,
         cellRenderer: (p: ICellRendererParams<AgreementSummary>) =>
           p.data ? (
             <div className="led-title">
@@ -74,13 +74,13 @@ export default function Ledger({
       {
         headerName: "Status",
         field: "status",
-        width: 148,
+        width: 136,
         cellRenderer: (p: ICellRendererParams<AgreementSummary>) =>
           p.data ? <StatusPill status={p.data.status} /> : null,
       },
       {
         headerName: "Split",
-        width: 132,
+        width: 92,
         sortable: false,
         filter: false,
         cellRenderer: (p: ICellRendererParams<AgreementSummary>) => <SplitBar row={p.data} />,
@@ -88,14 +88,14 @@ export default function Ledger({
       {
         headerName: "Contract",
         field: "totalCents",
-        width: 124,
+        width: 112,
         type: "rightAligned",
         valueFormatter: (p: ValueFormatterParams<AgreementSummary>) => money(p.value ?? 0),
       },
       {
         headerName: "Released",
         field: "releasedCents",
-        width: 124,
+        width: 104,
         type: "rightAligned",
         cellClass: "cell-mint",
         valueFormatter: (p: ValueFormatterParams<AgreementSummary>) =>
@@ -104,23 +104,16 @@ export default function Ledger({
       {
         headerName: "Returned",
         field: "returnedCents",
-        width: 124,
+        width: 112,
         type: "rightAligned",
         cellClass: "cell-dim",
         valueFormatter: (p: ValueFormatterParams<AgreementSummary>) =>
           p.value ? money(p.value) : "—",
       },
       {
-        headerName: "Clauses",
-        field: "clauseCount",
-        width: 100,
-        type: "rightAligned",
-        cellClass: "cell-dim",
-      },
-      {
         headerName: "Confidence",
         field: "confidence",
-        width: 118,
+        width: 124,
         type: "rightAligned",
         cellClass: "cell-dim",
         valueFormatter: (p: ValueFormatterParams<AgreementSummary>) =>
@@ -128,7 +121,7 @@ export default function Ledger({
       },
       {
         headerName: "Parties",
-        width: 190,
+        width: 160,
         sortable: false,
         filter: false,
         cellRenderer: (p: ICellRendererParams<AgreementSummary>) =>
@@ -137,14 +130,6 @@ export default function Ledger({
               {p.data.buyerName} <span className="faint">→</span> {p.data.sellerName}
             </span>
           ) : null,
-      },
-      {
-        headerName: "Opened",
-        field: "createdAt",
-        width: 116,
-        cellClass: "cell-dim mono",
-        valueFormatter: (p: ValueFormatterParams<AgreementSummary>) =>
-          p.value ? `${day(p.value)} ${clock(p.value)}` : "—",
       },
     ],
     [],

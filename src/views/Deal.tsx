@@ -90,6 +90,10 @@ export default function Deal({
   const canProve = ["FUNDED", "EVIDENCE", "ADJUDICATED"].includes(s);
   const hasVerdict = Boolean(a.verdict);
   const isSettled = s === "SETTLED";
+  // Status is not proof of a hold: adjudication is allowed before funding, so an
+  // ADJUDICATED deal can have no authorization at all. Only PayPal's own
+  // authorization id means money is actually reserved.
+  const moneyIsHeld = Boolean(a.paypal.authorizationId) && !isSettled;
 
   const evidenceFor = (clauseId: string) => a.evidence.filter((e) => e.clauseId === clauseId);
   const missingClauses = a.clauses.filter((c) => evidenceFor(c.id).length === 0);
@@ -233,7 +237,7 @@ export default function Deal({
                       </p>
                     </div>
                     <div className="hold-badge">
-                      <span className="muted small">Held</span>
+                      <span className="muted small">Hold</span>
                       <strong className="mono">{money(a.totalCents, a.currency)}</strong>
                       <span className="pill pill-mint">
                         <i className="pill-dot" /> intent: AUTHORIZE
@@ -573,7 +577,7 @@ export default function Deal({
             <div className="rail-money">
               <div>
                 <span>Held</span>
-                <strong className="mono">{isFunded ? money(a.totalCents) : "—"}</strong>
+                <strong className="mono">{moneyIsHeld ? money(a.totalCents) : "—"}</strong>
               </div>
               <div>
                 <span>Released</span>

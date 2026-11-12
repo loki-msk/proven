@@ -137,7 +137,7 @@ Draft the agreement now.`;
     weight: clamp01(c.weight) || 1 / parsed.clauses.length,
   }));
 
-  return { title: parsed.title.trim(), clauses, model: TEXT_MODEL };
+  return { title: tidyTitle(parsed.title, 90), clauses: normalizeClauseWeights(clauses), model: TEXT_MODEL };
 }
 
 /* ------------------------------------------------------------------ */
@@ -366,11 +366,55 @@ const FALLBACK_TEMPLATE: Array<Omit<Clause, "id">> = [
   },
 ];
 
+/**
+ * Weights are persisted as normalised shares, not raw model scores.
+ *
+ * The prompt asks for weights summing to 1.0 and the model usually complies,
+ * but "usually" is not a basis for money. Normalising on ingest means the UI can
+ * show a clause's real share of the price, the displayed weights always sum to
+ * 100%, and computeSettlement() stays the only place that divides.
+ */
+function normalizeClauseWeights(clauses: Clause[]): Clause[] {
+  const raw = clauses.map((c) => (Number.isFinite(c.weight) && c.weight > 0 ? c.weight : 0));
+  const total = raw.reduce((a, b) => a + b, 0);
+  if (total <= 0) {
+    const even = 1 / Math.max(1, clauses.length);
+    return clauses.map((c) => ({ ...c, weight: even }));
+  }
+  return clauses.map((c, i) => ({ ...c, weight: Number((raw[i] / total).toFixed(6)) }));
+}
+
+/**
+ * Titles come from prose, so they need a clean cut: no mid-word truncation,
+ * no trailing comma, no double spaces.
+ */
+function tidyTitle(line: string, max = 70): string {
+  const clean = line.replace(/\s+/g, " ").trim().replace(/^[-–—\s]+|[,;:.\-–—\s]+$/g, "");
+  if (clean.length <= max) return clean;
+  const cut = clean.slice(0, max);
+  const space = cut.lastIndexOf(" ");
+  return `${(space > max * 0.6 ? cut.slice(0, space) : cut).trim()}…`;
+}
+
+/**
+ * A fallback draft cannot understand the job, so it should not pretend to title
+ * it either. The first clause of a sentence is usually the noun phrase
+ * ("Kitchen backsplash replacement"), which reads far better than a 70-character
+ * slice of the whole message.
+ */
+function heuristicTitle(prose: string): string {
+  const firstLine = prose.split(/[\n.!]/).map((s) => s.trim()).find(Boolean) || "";
+  if (!firstLine) return "Milestone agreement";
+  const head = firstLine.split(",")[0].trim();
+  return tidyTitle(head.length >= 12 && head.length <= 70 ? head : firstLine);
+}
+
 function heuristicDraft(prose: string, totalCents: number) {
-  const firstLine = prose.split(/[\n.!]/).map((s) => s.trim()).find(Boolean) || "Milestone agreement";
   return {
-    title: firstLine.slice(0, 70),
-    clauses: FALLBACK_TEMPLATE.map((c, i) => ({ ...c, id: `c${i + 1}` })),
+    title: heuristicTitle(prose),
+    clauses: normalizeClauseWeights(
+      FALLBACK_TEMPLATE.map((c, i) => ({ ...c, id: `c${i + 1}` })),
+    ),
     model: "heuristic-fallback",
   };
 }

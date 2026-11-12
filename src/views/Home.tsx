@@ -67,6 +67,9 @@ export default function Home({ onCreated }: { onCreated: (id: string) => void })
               <span>a PayPal hold can last</span>
             </div>
           </div>
+          <p className="hero-sources">
+            Remote, 2025 · Intuit QuickBooks, 2025 · PayPal authorization docs
+          </p>
         </div>
 
         <Card className="hero-form rise rise-2">
@@ -119,7 +122,8 @@ export default function Home({ onCreated }: { onCreated: (id: string) => void })
             </Button>
 
             <p className="micro">
-              PayPal sandbox only. No real money moves. AI proposes; a human always approves.
+              PayPal sandbox only. No real money moves. AI proposes fractions; deterministic code sets
+              the amount, and money moves only on an explicit settlement call.
             </p>
           </form>
         </Card>
